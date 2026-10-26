@@ -28,13 +28,29 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     return 0.2 * signal * envelope
 
 
-waveform = input('Input waveform: sine, square, saw: ')
+# waveform = input('Input waveform: sine, square, saw: ')
 
-# Play an A4 note
-audio = make_tone(440, 1.0, waveform)
+# # Play an A4 note
+# audio = make_tone(440, 1.0, waveform)
 
-sd.play(audio, SAMPLE_RATE)
-sd.wait()
+# sd.play(audio, SAMPLE_RATE)
+# sd.wait()
 
 
 
+while True:
+    waveform = input("Waveform (sine, square, saw, quit): ").lower() or "sine"
+
+    if waveform == "quit":
+        break
+
+    # frequency, duration = map(float, input("Frequency (Hz) and Duration (seconds): ").split())
+    frequency = float(input("Frequency (Hz): "))
+    # duration = float(input("Duration (seconds): "))
+    duration = 1.0
+
+
+    audio = make_tone(frequency, duration, waveform)
+
+    sd.play(audio, SAMPLE_RATE)
+    sd.wait()
