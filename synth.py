@@ -45,9 +45,13 @@ while True:
         break
 
     # frequency, duration = map(float, input("Frequency (Hz) and Duration (seconds): ").split())
-    frequency = float(input("Frequency (Hz): "))
+    # frequency = float(input("Frequency (Hz): "))
     # duration = float(input("Duration (seconds): "))
     duration = 1.0
+
+    # Get frequency from midi number f(n) = 440 * 2^((n-69)/12)
+    midi_number = int(input("MIDI number (0-127): "))
+    frequency = 440 * 2 ** ((midi_number - 69) / 12)
 
 
     audio = make_tone(frequency, duration, waveform)
