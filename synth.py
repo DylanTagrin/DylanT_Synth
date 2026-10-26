@@ -28,14 +28,36 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     return 0.2 * signal * envelope
 
 
-# waveform = input('Input waveform: sine, square, saw: ')
+# Function to convert note name to MIDI number
 
-# # Play an A4 note
-# audio = make_tone(440, 1.0, waveform)
+NOTE_OFFSETS = {
+    "C": 0,
+    "C#": 1,
+    "D": 2,
+    "D#": 3,
+    "E": 4,
+    "F": 5,
+    "F#": 6,
+    "G": 7,
+    "G#": 8,
+    "A": 9,
+    "A#": 10,
+    "B": 11
+}
 
-# sd.play(audio, SAMPLE_RATE)
-# sd.wait()
+def note_to_frequency(note):
+    # Example input: "C4", "F#3", "A4"
 
+    note_name = note[:-1]  # Everything except final character
+    octave = int(note[-1]) # Last character
+
+    semitone = NOTE_OFFSETS[note_name.upper()]
+
+    midi = 12 * (octave + 1) + semitone
+    # midi number between 0 and 127, where A4 = 69
+    frequency = 440 * 2 ** ((midi - 69) / 12)
+
+    return frequency
 
 
 while True:
@@ -49,10 +71,9 @@ while True:
     # duration = float(input("Duration (seconds): "))
     duration = 1.0
 
-    # Get frequency from midi number f(n) = 440 * 2^((n-69)/12)
-    midi_number = int(input("MIDI number (0-127): "))
-    frequency = 440 * 2 ** ((midi_number - 69) / 12)
-
+    # Get frequency from note name
+    note = input("Note (e.g., C4, F#3, A4): ")
+    frequency = note_to_frequency(note)
 
     audio = make_tone(frequency, duration, waveform)
 
