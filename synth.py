@@ -59,6 +59,19 @@ def note_to_frequency(note):
 
     return frequency
 
+def make_chord(notes, duration=1.0, waveform="sine"):
+    chord = np.zeros(int(SAMPLE_RATE * duration))
+
+    for note in notes:
+        frequency = note_to_frequency(note)
+        chord += make_tone(frequency, duration, waveform)
+
+    chord /= len(notes)
+
+    return chord
+
+
+
 
 while True:
     waveform = input("Waveform (sine, square, saw, quit): ").lower() or "sine"
@@ -72,10 +85,15 @@ while True:
     duration = 1.0
 
     # Get frequency from note name
-    note = input("Note (e.g., C4, F#3, A4): ")
-    frequency = note_to_frequency(note)
+    # note = input("Note (e.g., C4, F#3, A4): ")
+    # frequency = note_to_frequency(note)
+    # audio = make_tone(frequency, duration, waveform)
 
-    audio = make_tone(frequency, duration, waveform)
+    # Use a full cord instead of a single note
+    notes = input("Notes (e.g. C4 E4 G4): ").upper().split()
+    audio = make_chord(notes, duration, waveform)
+
+
 
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
