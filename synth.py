@@ -191,8 +191,7 @@ def apply_filter(signal, cutoff=1000, filter_type="lowpass", order=4):
 from scipy.signal import butter, sosfilt
 
 # Dynamically apply a lowpass filter that sweeps from start_cutoff to end_cutoff over sweep_duration seconds
-def dynamic_lowpass(audio, start_cutoff=5000,
-                    end_cutoff=500, sweep_duration=1.0):
+def dynamic_lowpass(audio, start_cutoff=5000, end_cutoff=500, sweep_duration=1.0):
 
     chunk_size = 256
 
@@ -208,9 +207,7 @@ def dynamic_lowpass(audio, start_cutoff=5000,
         progress = np.clip(t / sweep_duration, 0, 1)
 
         # Calculate cutoff for this chunk
-        cutoff = start_cutoff + (
-            end_cutoff - start_cutoff
-        ) * progress
+        cutoff = start_cutoff + (end_cutoff - start_cutoff) * progress
 
         cutoff = np.clip(cutoff, 20, SAMPLE_RATE / 2 - 100)
 
@@ -223,9 +220,7 @@ def dynamic_lowpass(audio, start_cutoff=5000,
         )
 
         # Process chunk, retaining filter state
-        output[start:end], zi = sosfilt(
-            sos, audio[start:end], zi=zi
-        )
+        output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
 
     return output
 
@@ -242,12 +237,7 @@ while True:
     pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
     audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
     # audio = apply_filter(audio,cutoff=3000,filter_type="lowpass")
-    audio = dynamic_lowpass(
-    audio,
-    start_cutoff=6000,
-    end_cutoff=400,
-    sweep_duration=2.0
-    )
+    audio = dynamic_lowpass(audio,start_cutoff=6000,end_cutoff=400,sweep_duration=3)
 
 
     sd.play(audio, SAMPLE_RATE)
