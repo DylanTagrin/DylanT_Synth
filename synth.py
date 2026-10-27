@@ -118,7 +118,7 @@ while True:
     
 
     # Use a full cord instead of a single note
-    notes = input("Notes (e.g. C4 E4 G4): ").upper().split()
+    notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or ["C4", "E4", "G4"]
     audio = make_chord(notes, duration, waveform)
 
 
