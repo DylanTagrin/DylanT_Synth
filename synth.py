@@ -1,5 +1,7 @@
 import numpy as np
 import sounddevice as sd
+from scipy.signal import butter, sosfilt
+
 
 SAMPLE_RATE = 44100
 
@@ -173,6 +175,61 @@ def modulate_frequency(freq, pitch_effect):
     else:
         raise ValueError("Unknown modulation type")
 
+# Create a butterworth filter
+def apply_filter(signal, cutoff=1000, filter_type="lowpass", order=4):
+
+    sos = butter(
+        order,      # how quickly the filter attenuates frequencies beyond the cutoff
+        cutoff,     # characteristic frequency
+        btype=filter_type,  # filter type
+        fs=SAMPLE_RATE, 
+        output="sos"
+    )
+
+    return sosfilt(sos, signal)     #sosfilt applies the filter to the signal using second-order sections
+
+from scipy.signal import butter, sosfilt
+
+# Dynamically apply a lowpass filter that sweeps from start_cutoff to end_cutoff over sweep_duration seconds
+def dynamic_lowpass(audio, start_cutoff=5000,
+                    end_cutoff=500, sweep_duration=1.0):
+
+    chunk_size = 256
+
+    output = np.zeros_like(audio, dtype=float)
+    zi = np.zeros((2, 2))  # State for a 4th-order SOS filter
+
+    for start in range(0, len(audio), chunk_size):
+
+        end = min(start + chunk_size, len(audio))
+
+        # Current position in the filter sweep
+        t = start / SAMPLE_RATE
+        progress = np.clip(t / sweep_duration, 0, 1)
+
+        # Calculate cutoff for this chunk
+        cutoff = start_cutoff + (
+            end_cutoff - start_cutoff
+        ) * progress
+
+        cutoff = np.clip(cutoff, 20, SAMPLE_RATE / 2 - 100)
+
+        # Design filter for current cutoff
+        sos = butter(
+            4, cutoff,
+            btype="lowpass",
+            fs=SAMPLE_RATE,
+            output="sos"
+        )
+
+        # Process chunk, retaining filter state
+        output[start:end], zi = sosfilt(
+            sos, audio[start:end], zi=zi
+        )
+
+    return output
+
+
 
 while True:
     waveform = input("Waveform (sine, square, saw, quit): ").lower() or "sine"
@@ -182,9 +239,16 @@ while True:
     # Use a full cord instead of a single note
     notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or ["C4", "E4", "G4"]
     
-    pitch_effect = input("Do you want modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
+    pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
     audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
-    # audio = make_tone(vibrato(440, rate=5, depth=50), duration, waveform)
+    # audio = apply_filter(audio,cutoff=3000,filter_type="lowpass")
+    audio = dynamic_lowpass(
+    audio,
+    start_cutoff=6000,
+    end_cutoff=400,
+    sweep_duration=2.0
+    )
+
 
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
