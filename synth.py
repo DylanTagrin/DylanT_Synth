@@ -16,7 +16,9 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     envelope = make_adsr(duration, attack, decay, sustain, release)
     # Time -> Freuqnecy pack -> phase
     t = np.arange(len(envelope)) / SAMPLE_RATE
-    frequency = resolve_frequency(freq, t)
+    frequency = resolve_time_series(freq, t)
+    if np.any(frequency <= 0):
+        raise ValueError("Oscillator frequency must be positive")
     phase = 2 * np.pi * (np.cumsum(frequency) - frequency) / SAMPLE_RATE
 
     # Use the phase with a waveform to get a tone
@@ -110,31 +112,23 @@ def make_adsr(duration, attack=0.1, decay=0.2,
         release_env
     ])
 
-# Function that takes a frequency input (either a constant or a callable function) and returns an array of frequencies for each time step.
-def resolve_frequency(freq, t):
+# Function that takes x(t) and a range of t and returns an array for the output
+def resolve_time_series(value, t):
+    if callable(value):
+        value = value(t)
 
-    if callable(freq):
-        frequency = freq(t)
+    values = np.asarray(value, dtype=float)
 
-    else:
-        frequency = freq
+    if values.ndim == 0:
+        values = np.full(t.shape, values.item())
 
-    frequency = np.asarray(frequency, dtype=float)
+    if values.shape != t.shape:
+        raise ValueError("Time series must match time array")
 
-    # Constant frequency -> array
-    if frequency.ndim == 0:
-        frequency = np.full(len(t), frequency.item())
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Time series contains non-finite values")
 
-    if frequency.shape != t.shape:
-        raise ValueError("Frequency array must match time array")
-
-    if not np.all(np.isfinite(frequency)):
-        raise ValueError("Frequency must contain finite values")
-
-    if np.any(frequency <= 0):
-        raise ValueError("Frequency must be positive")
-
-    return frequency
+    return values
 
 # Frequency generating function for vibrato
 def vibrato(base_freq, rate=5, depth=10):
@@ -224,6 +218,24 @@ def dynamic_lowpass(audio, start_cutoff=5000, end_cutoff=500, sweep_duration=1.0
 
     return output
 
+# Dynamic Filter that can use different types of filters, variable chunk size and cutoffs
+def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
+    t = np.arange(len(audio)) / SAMPLE_RATE
+    cutoff_array = resolve_time_series(cutoff, t)
+
+    output = np.zeros_like(audio, dtype=float)
+    zi = np.zeros((order // 2, 2))
+
+    for start in range(0, len(audio), chunk_size):
+        end = min(start + chunk_size, len(audio))
+        fc = cutoff_array[start]
+
+        sos = butter(order, fc, btype=filter_type, fs=SAMPLE_RATE, output="sos")
+        output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
+
+    return output
+
+
 
 
 while True:
@@ -236,9 +248,11 @@ while True:
     
     pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
     audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
-    # audio = apply_filter(audio,cutoff=3000,filter_type="lowpass")
-    audio = dynamic_lowpass(audio,start_cutoff=6000,end_cutoff=400,sweep_duration=3)
 
+    # audio = dynamic_lowpass(audio,start_cutoff=6000,end_cutoff=400,sweep_duration=3)
+    # audio = dynamic_filter(audio, cutoff=2000, filter_type="highpass")
+    # audio = dynamic_filter(audio, cutoff=glide(6000, 400, 2.0))
+    # audio = dynamic_filter(audio, cutoff=vibrato(2000, rate=2, depth=1500))
 
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
