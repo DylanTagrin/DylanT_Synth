@@ -4,20 +4,20 @@ import sounddevice as sd
 SAMPLE_RATE = 44100
 
 attack=0.5
-decay=0.5 
+decay=0.3
 sustain=0.8
-release=1.0
-duration = 1.5
+release=0.5
+duration = 4
 
 def make_tone(freq=440, duration=1.0, waveform="sine"):
-
+    # Get envolope of amplitudes
     envelope = make_adsr(duration, attack, decay, sustain, release)
-
-    # Envelope determines how many samples we need
+    # Time -> Freuqnecy pack -> phase
     t = np.arange(len(envelope)) / SAMPLE_RATE
-    
-    phase = 2 * np.pi * freq * t
+    frequency = resolve_frequency(freq, t)
+    phase = 2 * np.pi * (np.cumsum(frequency) - frequency) / SAMPLE_RATE
 
+    # Use the phase with a waveform to get a tone
     if waveform == "sine":
         signal = np.sin(phase)
 
@@ -25,7 +25,7 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
         signal = np.where(np.sin(phase) >= 0, 1.0, -1.0)
 
     elif waveform == "saw":
-        signal = 2 * ((freq * t) % 1.0) - 1.0
+        signal = 2 * ((phase / (2 * np.pi)) % 1.0) - 1.0
 
     else:
         raise ValueError("Unknown waveform")
@@ -63,13 +63,13 @@ def note_to_frequency(note):
     return frequency
 
 # Function to create a band of tones (chord) from a list of notes
-def make_chord(notes, duration=1.0, waveform="sine"):
+def mix_tones(notes, duration=1.0, waveform="sine", modulation=None):
 
     if not notes:
         raise ValueError("Chord must contain at least one note")
 
     tones = [
-        make_tone(note_to_frequency(note), duration, waveform)
+        make_tone(modulate_frequency(note_to_frequency(note), modulation), duration, waveform)
         for note in notes
     ]
 
@@ -108,19 +108,83 @@ def make_adsr(duration, attack=0.1, decay=0.2,
         release_env
     ])
 
+# Function that takes a frequency input (either a constant or a callable function) and returns an array of frequencies for each time step.
+def resolve_frequency(freq, t):
+
+    if callable(freq):
+        frequency = freq(t)
+
+    else:
+        frequency = freq
+
+    frequency = np.asarray(frequency, dtype=float)
+
+    # Constant frequency -> array
+    if frequency.ndim == 0:
+        frequency = np.full(len(t), frequency.item())
+
+    if frequency.shape != t.shape:
+        raise ValueError("Frequency array must match time array")
+
+    if not np.all(np.isfinite(frequency)):
+        raise ValueError("Frequency must contain finite values")
+
+    if np.any(frequency <= 0):
+        raise ValueError("Frequency must be positive")
+
+    return frequency
+
+# Frequency generating function for vibrato
+def vibrato(base_freq, rate=5, depth=10):
+    def frequency(t):
+        return base_freq + depth * np.sin(2 * np.pi * rate * t)
+
+    return frequency
+
+# Frequency generating function for glide
+def glide(start_freq, end_freq, duration):
+    # Detect if end_freq is a note and not a float
+    if isinstance(end_freq, str):
+        end_freq = note_to_frequency(end_freq)
+    
+    def frequency(t):
+        progress = np.clip(t / duration, 0, 1)
+        return start_freq + (end_freq - start_freq) * progress
+
+    return frequency
+
+#Function that takes a freuqnecy and returns a callable function that modulates the frequency from one of the functions
+def modulate_frequency(freq, modulation):
+    if not modulation:
+        return freq
+
+    mod_type = modulation[0]
+
+    if mod_type == "vibrato":
+        rate = float(modulation[1])
+        depth = float(modulation[2])
+        return vibrato(freq, rate, depth)
+
+    elif mod_type == "glide":
+        end_freq = (modulation[1])
+        duration = float(modulation[2])
+        return glide(freq, end_freq, duration)
+
+    else:
+        raise ValueError("Unknown modulation type")
+
 
 while True:
     waveform = input("Waveform (sine, square, saw, quit): ").lower() or "sine"
-
     if waveform == "quit":
         break
 
-    
-
     # Use a full cord instead of a single note
     notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or ["C4", "E4", "G4"]
-    audio = make_chord(notes, duration, waveform)
-
+    
+    modulation = input("Do you want modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
+    audio = mix_tones(notes, duration, waveform, modulation=modulation)
+    # audio = make_tone(vibrato(440, rate=5, depth=50), duration, waveform)
 
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
