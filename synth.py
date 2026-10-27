@@ -3,8 +3,19 @@ import sounddevice as sd
 
 SAMPLE_RATE = 44100
 
+attack=0.5
+decay=0.5 
+sustain=0.8
+release=1.0
+duration = 1.5
+
 def make_tone(freq=440, duration=1.0, waveform="sine"):
-    t = np.arange(int(SAMPLE_RATE * duration)) / SAMPLE_RATE
+
+    envelope = make_adsr(duration, attack, decay, sustain, release)
+
+    # Envelope determines how many samples we need
+    t = np.arange(len(envelope)) / SAMPLE_RATE
+    
     phase = 2 * np.pi * freq * t
 
     if waveform == "sine":
@@ -19,17 +30,10 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     else:
         raise ValueError("Unknown waveform")
 
-    # Short fade to reduce audible clicks
-    fade = min(int(0.01 * SAMPLE_RATE), len(signal) // 2)
-    envelope = np.ones(len(signal))
-    envelope[:fade] = np.linspace(0, 1, fade)
-    envelope[-fade:] = np.linspace(1, 0, fade)
-
     return 0.2 * signal * envelope
 
 
 # Function to convert note name to MIDI number
-
 NOTE_OFFSETS = {
     "C": 0,
     "C#": 1,
@@ -44,7 +48,6 @@ NOTE_OFFSETS = {
     "A#": 10,
     "B": 11
 }
-
 def note_to_frequency(note):
     # Example input: "C4", "F#3", "A4"
 
@@ -59,18 +62,51 @@ def note_to_frequency(note):
 
     return frequency
 
+# Function to create a band of tones (chord) from a list of notes
 def make_chord(notes, duration=1.0, waveform="sine"):
-    chord = np.zeros(int(SAMPLE_RATE * duration))
 
-    for note in notes:
-        frequency = note_to_frequency(note)
-        chord += make_tone(frequency, duration, waveform)
+    if not notes:
+        raise ValueError("Chord must contain at least one note")
 
-    chord /= len(notes)
+    tones = [
+        make_tone(note_to_frequency(note), duration, waveform)
+        for note in notes
+    ]
 
-    return chord
+    return np.mean(tones, axis=0)
 
+# Function to create an ADSR envelope
+def make_adsr(duration, attack=0.1, decay=0.2,
+              sustain=0.6, release=0.3):
 
+    # Duration is how long the key is held.
+    hold_samples = int(duration * SAMPLE_RATE)
+
+    a = int(attack * SAMPLE_RATE)
+    d = int(decay * SAMPLE_RATE)
+    r = int(release * SAMPLE_RATE)
+
+    if a + d > hold_samples:
+        raise ValueError("Note must be longer than attack + decay")
+
+    # Attack: 0 -> 1
+    attack_env = np.linspace(0, 1, a, endpoint=False)
+
+    # Decay: 1 -> sustain
+    decay_env = np.linspace(1, sustain, d, endpoint=False)
+
+    # Sustain: constant amplitude
+    sustain_env = np.full(hold_samples - a - d, sustain)
+
+    # Release: sustain -> 0
+    release_env = np.linspace(sustain, 0, r, endpoint=True)
+
+    return np.concatenate([
+        attack_env,
+        decay_env,
+        sustain_env,
+        release_env
+    ])
 
 
 while True:
@@ -79,20 +115,11 @@ while True:
     if waveform == "quit":
         break
 
-    # frequency, duration = map(float, input("Frequency (Hz) and Duration (seconds): ").split())
-    # frequency = float(input("Frequency (Hz): "))
-    # duration = float(input("Duration (seconds): "))
-    duration = 1.0
-
-    # Get frequency from note name
-    # note = input("Note (e.g., C4, F#3, A4): ")
-    # frequency = note_to_frequency(note)
-    # audio = make_tone(frequency, duration, waveform)
+    
 
     # Use a full cord instead of a single note
     notes = input("Notes (e.g. C4 E4 G4): ").upper().split()
     audio = make_chord(notes, duration, waveform)
-
 
 
     sd.play(audio, SAMPLE_RATE)
