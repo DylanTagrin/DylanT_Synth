@@ -63,13 +63,13 @@ def note_to_frequency(note):
     return frequency
 
 # Function to create a band of tones (chord) from a list of notes
-def mix_tones(notes, duration=1.0, waveform="sine", modulation=None):
+def mix_tones(notes, duration=1.0, waveform="sine", pitch_effect=None):
 
     if not notes:
         raise ValueError("Chord must contain at least one note")
 
     tones = [
-        make_tone(modulate_frequency(note_to_frequency(note), modulation), duration, waveform)
+        make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, waveform)
         for note in notes
     ]
 
@@ -154,20 +154,20 @@ def glide(start_freq, end_freq, duration):
     return frequency
 
 #Function that takes a freuqnecy and returns a callable function that modulates the frequency from one of the functions
-def modulate_frequency(freq, modulation):
-    if not modulation:
+def modulate_frequency(freq, pitch_effect):
+    if not pitch_effect:
         return freq
 
-    mod_type = modulation[0]
+    mod_type = pitch_effect[0]
 
     if mod_type == "vibrato":
-        rate = float(modulation[1])
-        depth = float(modulation[2])
+        rate = float(pitch_effect[1])
+        depth = float(pitch_effect[2])
         return vibrato(freq, rate, depth)
 
     elif mod_type == "glide":
-        end_freq = (modulation[1])
-        duration = float(modulation[2])
+        end_freq = (pitch_effect[1])
+        duration = float(pitch_effect[2])
         return glide(freq, end_freq, duration)
 
     else:
@@ -182,8 +182,8 @@ while True:
     # Use a full cord instead of a single note
     notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or ["C4", "E4", "G4"]
     
-    modulation = input("Do you want modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
-    audio = mix_tones(notes, duration, waveform, modulation=modulation)
+    pitch_effect = input("Do you want modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
+    audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
     # audio = make_tone(vibrato(440, rate=5, depth=50), duration, waveform)
 
     sd.play(audio, SAMPLE_RATE)
