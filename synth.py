@@ -10,6 +10,11 @@ decay=0.3
 sustain=0.8
 release=0.5
 duration = 4
+gain = 0.2
+ADSR = [0.5, 0.3, 0.8, 0.5]
+waveform = "sine"
+notes = ["C4", "E4", "G4"]
+
 
 def make_tone(freq=440, duration=1.0, waveform="sine"):
     # Get envolope of amplitudes
@@ -41,7 +46,7 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     else:
         raise ValueError("Unknown waveform")
 
-    return 0.2 * signal * envelope
+    return gain * signal * envelope
 
 
 # Function to convert note name to MIDI number
@@ -182,22 +187,6 @@ def modulate_frequency(freq, pitch_effect):
 # Dynamic Filter that can use different types of filters, variable chunk size and cutoffs
 def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
     t = np.arange(len(audio)) / SAMPLE_RATE
-    cutoff_array = resolve_time_series(cutoff, t)
-
-    output = np.zeros_like(audio, dtype=float)
-    zi = np.zeros((order // 2, 2))
-
-    for start in range(0, len(audio), chunk_size):
-        end = min(start + chunk_size, len(audio))
-        fc = cutoff_array[start]
-
-        sos = butter(order, fc, btype=filter_type, fs=SAMPLE_RATE, output="sos")
-        output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
-
-    return output
-
-def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
-    t = np.arange(len(audio)) / SAMPLE_RATE
 
     if filter_type == "bandpass":
         low = resolve_time_series(cutoff[0], t)
@@ -232,17 +221,36 @@ def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_siz
 
 
 while True:
-    waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or "sine"
+    
+
+    new_waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or waveform
+    if new_waveform:
+        waveform = new_waveform
     if waveform == "quit":
         break
 
     # Use a full cord instead of a single note
-    notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or ["C4", "E4", "G4"]
-    
+    new_notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or notes
+    if new_notes:
+        notes = new_notes
     pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
+
+    new_gain = float(input("Do you wish to change the gain? ") or gain)
+    if new_gain:
+        gain = new_gain
+    new_duration = float(input("Do you wish to change the duration? ") or duration)
+    if new_duration:
+        duration = new_duration
+    
+    
+    
+    new_adsr = input("ADSR (A D S R), Enter to keep current: ").split()
+    if new_adsr:
+        ADSR = list(map(float, new_adsr))
+    attack, decay, sustain, release = ADSR
+
     audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
-
-
+    # filter_choice = input("Do you want to apply a filter? [lowpass, highpass, bandpass, none]: ").lower() or "none"
 
 
     sd.play(audio, SAMPLE_RATE)
