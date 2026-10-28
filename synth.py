@@ -93,37 +93,38 @@ def mix_tones(notes, duration=1.0, waveform="sine", pitch_effect=None):
     return np.mean(tones, axis=0)
 
 # Function to create an ADSR envelope
-def make_adsr(duration, attack=0.1, decay=0.2,
-              sustain=0.6, release=0.3):
+def make_adsr(duration, attack=0.1, decay=0.2, sustain=0.6, release=0.3):
+    if min(duration, attack, decay, release) < 0 or not 0 <= sustain <= 1:
+        raise ValueError("Invalid ADSR parameters")
 
-    # Duration is how long the key is held.
     hold_samples = int(duration * SAMPLE_RATE)
+    release_samples = int(release * SAMPLE_RATE)
+    t = np.arange(hold_samples) / SAMPLE_RATE
 
-    a = int(attack * SAMPLE_RATE)
-    d = int(decay * SAMPLE_RATE)
-    r = int(release * SAMPLE_RATE)
+    envelope = np.full(hold_samples, sustain, dtype=float)
 
-    if a + d > hold_samples:
-        raise ValueError("Note must be longer than attack + decay")
+    if attack > 0:
+        mask = t < attack
+        envelope[mask] = t[mask] / attack
 
-    # Attack: 0 -> 1
-    attack_env = np.linspace(0, 1, a, endpoint=False)
+    if decay > 0:
+        mask = (t >= attack) & (t < attack + decay)
+        envelope[mask] = 1 - (1 - sustain) * (t[mask] - attack) / decay
 
-    # Decay: 1 -> sustain
-    decay_env = np.linspace(1, sustain, d, endpoint=False)
+    if attack == 0 and decay == 0:
+        envelope[:] = sustain
 
-    # Sustain: constant amplitude
-    sustain_env = np.full(hold_samples - a - d, sustain)
+    # Release begins at the amplitude reached when the key is released
+    if release_samples > 0:
+        if hold_samples > 0:
+            release_level = envelope[-1]
+        else:
+            release_level = 0
 
-    # Release: sustain -> 0
-    release_env = np.linspace(sustain, 0, r, endpoint=True)
+        release_env = np.linspace(release_level, 0, release_samples + 1)[1:]
+        envelope = np.concatenate((envelope, release_env))
 
-    return np.concatenate([
-        attack_env,
-        decay_env,
-        sustain_env,
-        release_env
-    ])
+    return envelope
 
 # Function that takes x(t) and a range of t and returns an array for the output
 def resolve_time_series(value, t):
@@ -181,7 +182,6 @@ def modulate_frequency(freq, pitch_effect):
 
     else:
         raise ValueError("Unknown modulation type")
-
 
 
 # Dynamic Filter that can use different types of filters, variable chunk size and cutoffs
