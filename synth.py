@@ -31,6 +31,13 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     elif waveform == "saw":
         signal = 2 * ((phase / (2 * np.pi)) % 1.0) - 1.0
 
+    elif waveform == "triangle":
+        signal = 1 - 4 * np.abs((((phase - np.pi / 2) / (2 * np.pi)) % 1) - 0.5)
+
+    elif waveform == "pulse":
+        duty_cycle = 0.3  # 30% high, 70% low
+        signal = np.where((phase % (2 * np.pi)) < (duty_cycle * 2 * np.pi), 1.0, -1.0)
+
     else:
         raise ValueError("Unknown waveform")
 
@@ -52,6 +59,7 @@ NOTE_OFFSETS = {
     "A#": 10,
     "B": 11
 }
+
 def note_to_frequency(note):
     # Example input: "C4", "F#3", "A4"
 
@@ -169,54 +177,7 @@ def modulate_frequency(freq, pitch_effect):
     else:
         raise ValueError("Unknown modulation type")
 
-# Create a butterworth filter
-def apply_filter(signal, cutoff=1000, filter_type="lowpass", order=4):
 
-    sos = butter(
-        order,      # how quickly the filter attenuates frequencies beyond the cutoff
-        cutoff,     # characteristic frequency
-        btype=filter_type,  # filter type
-        fs=SAMPLE_RATE, 
-        output="sos"
-    )
-
-    return sosfilt(sos, signal)     #sosfilt applies the filter to the signal using second-order sections
-
-from scipy.signal import butter, sosfilt
-
-# Dynamically apply a lowpass filter that sweeps from start_cutoff to end_cutoff over sweep_duration seconds
-def dynamic_lowpass(audio, start_cutoff=5000, end_cutoff=500, sweep_duration=1.0):
-
-    chunk_size = 256
-
-    output = np.zeros_like(audio, dtype=float)
-    zi = np.zeros((2, 2))  # State for a 4th-order SOS filter
-
-    for start in range(0, len(audio), chunk_size):
-
-        end = min(start + chunk_size, len(audio))
-
-        # Current position in the filter sweep
-        t = start / SAMPLE_RATE
-        progress = np.clip(t / sweep_duration, 0, 1)
-
-        # Calculate cutoff for this chunk
-        cutoff = start_cutoff + (end_cutoff - start_cutoff) * progress
-
-        cutoff = np.clip(cutoff, 20, SAMPLE_RATE / 2 - 100)
-
-        # Design filter for current cutoff
-        sos = butter(
-            4, cutoff,
-            btype="lowpass",
-            fs=SAMPLE_RATE,
-            output="sos"
-        )
-
-        # Process chunk, retaining filter state
-        output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
-
-    return output
 
 # Dynamic Filter that can use different types of filters, variable chunk size and cutoffs
 def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
@@ -235,11 +196,43 @@ def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_siz
 
     return output
 
+def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
+    t = np.arange(len(audio)) / SAMPLE_RATE
+
+    if filter_type == "bandpass":
+        low = resolve_time_series(cutoff[0], t)
+        high = resolve_time_series(cutoff[1], t)
+        if np.any(low >= high):
+            raise ValueError("Lower cutoff must be below upper cutoff")
+        cutoffs = np.column_stack((low, high))
+    else:
+        cutoffs = resolve_time_series(cutoff, t)
+
+    if np.any(cutoffs <= 0) or np.any(cutoffs >= SAMPLE_RATE / 2):
+        raise ValueError("Cutoffs must lie between 0 and the Nyquist frequency")
+
+    output = np.zeros_like(audio, dtype=float)
+    zi = None
+
+    for start in range(0, len(audio), chunk_size):
+        end = min(start + chunk_size, len(audio))
+        fc = cutoffs[start]
+
+        sos = butter(order, fc, btype=filter_type, fs=SAMPLE_RATE, output="sos")
+
+        if zi is None:
+            zi = np.zeros((len(sos), 2))
+
+        output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
+
+    return output
+
+
 
 
 
 while True:
-    waveform = input("Waveform (sine, square, saw, quit): ").lower() or "sine"
+    waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or "sine"
     if waveform == "quit":
         break
 
@@ -249,10 +242,8 @@ while True:
     pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
     audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
 
-    # audio = dynamic_lowpass(audio,start_cutoff=6000,end_cutoff=400,sweep_duration=3)
-    # audio = dynamic_filter(audio, cutoff=2000, filter_type="highpass")
-    # audio = dynamic_filter(audio, cutoff=glide(6000, 400, 2.0))
-    # audio = dynamic_filter(audio, cutoff=vibrato(2000, rate=2, depth=1500))
+
+
 
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
