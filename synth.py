@@ -1,7 +1,20 @@
 import numpy as np
 import sounddevice as sd
 from scipy.signal import butter, sosfilt
+import json
+from pathlib import Path
 
+PRESET_FILE = Path(__file__).with_name("presets.json")
+
+def read_presets():
+    with open(PRESET_FILE, "r") as file:
+        return json.load(file)
+
+def save_presets():
+    with open(PRESET_FILE, "w") as file:
+        json.dump(PRESETS, file, indent=4)
+
+PRESETS = read_presets()
 
 SAMPLE_RATE = 44100
 
@@ -19,14 +32,9 @@ DEFAULT_SETTINGS = {
 
 settings = DEFAULT_SETTINGS.copy()
 
-PRESETS = {
-    "pluck": {"waveform": "triangle", "attack": 0.005, "decay": 0.2, "sustain": 0, "release": 0.15},
-    "pad": {"waveform": "saw", "attack": 0.5, "decay": 0.3, "sustain": 0.8, "release": 1.0,
-            "filter_type": "lowpass", "cutoff": 1500},
-    "lead": {"waveform": "square", "attack": 0.02, "decay": 0.15, "sustain": 0.7, "release": 0.2,
-             "filter_type": "lowpass", "cutoff": 3000}
-}
 
+
+notes = ["C4", "E4", "G4"]
 
 # Function that takes an input from config and a frequency in Hz and a duration to make a tone
 def make_tone(freq=440, duration=None, config=None):
@@ -101,20 +109,20 @@ def note_to_frequency(note):
     return frequency
 
 # Function to create a band of tones (chord) from a list of notes
-def mix_tones(notes, duration=None, config=None, pitch_effect=None):
-    if not notes:
-        raise ValueError("Chord must contain at least one note")
+def mix_tones(notes, duration=None, config=None):
+    config = settings if config is None else config
+    pitch_effect = config.get("pitch_effect")
 
     tones = [
         make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, config)
         for note in notes
     ]
-    
-    audio = np.mean(tones, axis=0)
-    config = settings if config is None else config
 
-    if config["filter_type"] != "none":
-        audio = dynamic_filter(audio, cutoff=config["cutoff"], filter_type=config["filter_type"])
+    audio = np.mean(tones, axis=0)
+
+    if config.get("filter") is not None:
+        f = config["filter"]
+        audio = dynamic_filter(audio, cutoff=f["cutoff"], filter_type=f["type"], order=f.get("order", 4))
 
     return audio
 
@@ -209,7 +217,6 @@ def modulate_frequency(freq, pitch_effect):
     else:
         raise ValueError("Unknown modulation type")
 
-
 # Dynamic Filter that can use different types of filters, variable chunk size and cutoffs
 def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_size=256):
     t = np.arange(len(audio)) / SAMPLE_RATE
@@ -241,6 +248,20 @@ def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_siz
         output[start:end], zi = sosfilt(sos, audio[start:end], zi=zi)
 
     return output
+
+# Functions like modulate_frequency() but this time to extract json words and replace them with a function, works for filters too
+def resolve_effect(effect, base=None):
+    if not isinstance(effect, dict):
+        return effect
+
+    mode = effect["mode"]
+
+    if mode == "glide":
+        return glide(effect.get("start", base), effect["end"], effect["duration"])
+    elif mode == "vibrato":
+        return vibrato(effect.get("base", base), effect["rate"], effect["depth"])
+
+    raise ValueError(f"Unknown effect: {mode}")
 
 # Function to update a setting [name] with a [value]
 def update_setting(name, value):
@@ -301,8 +322,6 @@ def change_settings():
 
 
 
-
-notes = ["C4", "E4", "G4"]
 
 print("Python Synth — type 'help' for commands")
 

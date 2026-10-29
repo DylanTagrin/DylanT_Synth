@@ -1,0 +1,34 @@
+
+{
+    "pluck": {
+        "waveform": "triangle",
+        "attack": 0.005,
+        "decay": 0.2,
+        "sustain": 0.0,
+        "release": 0.15
+    },
+    "bass": {
+        "waveform": "saw",
+        "gain": 0.2,
+        "attack": 0.01,
+        "decay": 0.3,
+        "sustain": 0.6,
+        "filter": {
+            "type": "lowpass",
+            "cutoff": 900
+        }
+    },
+    "sweep": {
+        "waveform": "saw",
+        "attack": 0.2,
+        "filter": {
+            "type": "lowpass",
+            "cutoff": {
+                "mode": "glide",
+                "start": 6000,
+                "end": 400,
+                "duration": 2
+            }
+        }
+    }
+}
