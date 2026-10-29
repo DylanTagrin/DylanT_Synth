@@ -1,33 +1,45 @@
 
 {
-    "pluck": {
-        "waveform": "triangle",
-        "attack": 0.005,
-        "decay": 0.2,
-        "sustain": 0.0,
-        "release": 0.15
-    },
-    "bass": {
-        "waveform": "saw",
+    "defaults": {
+        "waveform": "sine",
+        "duration": 1.0,
         "gain": 0.2,
-        "attack": 0.01,
-        "decay": 0.3,
-        "sustain": 0.6,
-        "filter": {
-            "type": "lowpass",
-            "cutoff": 900
-        }
+        "attack": 0.1,
+        "decay": 0.2,
+        "sustain": 0.7,
+        "release": 0.3,
+        "pitch_effect": null,
+        "filter": null
     },
-    "sweep": {
-        "waveform": "saw",
-        "attack": 0.2,
-        "filter": {
-            "type": "lowpass",
-            "cutoff": {
-                "mode": "glide",
-                "start": 6000,
-                "end": 400,
-                "duration": 2
+    "presets": {
+        "pluck": {
+            "waveform": "triangle",
+            "attack": 0.005,
+            "decay": 0.2,
+            "sustain": 0,
+            "release": 0.15
+        },
+        "bass": {
+            "waveform": "saw",
+            "attack": 0.01,
+            "decay": 0.3,
+            "sustain": 0.6,
+            "filter": {
+                "type": "lowpass",
+                "cutoff": 900
+            }
+        },
+        "sweep": {
+            "waveform": "saw",
+            "attack": 0.2,
+            "filter": {
+                "type": "lowpass",
+                "cutoff": {
+                    "mode": "glide",
+                    "start": 6000,
+                    "end": 400,
+                    "duration": 2
+                }
             }
         }
     }

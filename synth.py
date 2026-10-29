@@ -12,28 +12,14 @@ def read_presets():
 
 def save_presets():
     with open(PRESET_FILE, "w") as file:
-        json.dump(PRESETS, file, indent=4)
+        json.dump({"defaults": DEFAULT_SETTINGS, "presets": PRESETS}, file, indent=4)
 
-PRESETS = read_presets()
-
-SAMPLE_RATE = 44100
-
-DEFAULT_SETTINGS = {
-    "waveform": "sine",
-    "duration": 1.0,
-    "gain": 0.2,
-    "attack": 0.1,
-    "decay": 0.2,
-    "sustain": 0.7,
-    "release": 0.3,
-    "filter_type": "none",
-    "cutoff": 2000
-}
-
+library = read_presets()
+DEFAULT_SETTINGS = library["defaults"]
+PRESETS = library["presets"]
 settings = DEFAULT_SETTINGS.copy()
 
-
-
+SAMPLE_RATE = 44100
 notes = ["C4", "E4", "G4"]
 
 # Function that takes an input from config and a frequency in Hz and a duration to make a tone
@@ -111,10 +97,11 @@ def note_to_frequency(note):
 # Function to create a band of tones (chord) from a list of notes
 def mix_tones(notes, duration=None, config=None):
     config = settings if config is None else config
-    pitch_effect = config.get("pitch_effect")
+    if not notes:
+        raise ValueError("Must provide at least one note")
 
     tones = [
-        make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, config)
+        make_tone(resolve_effect(config.get("pitch_effect"), note_to_frequency(note)), duration, config)
         for note in notes
     ]
 
@@ -122,7 +109,7 @@ def mix_tones(notes, duration=None, config=None):
 
     if config.get("filter") is not None:
         f = config["filter"]
-        audio = dynamic_filter(audio, cutoff=f["cutoff"], filter_type=f["type"], order=f.get("order", 4))
+        audio = dynamic_filter(audio, cutoff=resolve_cutoff(f["cutoff"]), filter_type=f["type"], order=f.get("order", 4))
 
     return audio
 
@@ -251,6 +238,9 @@ def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_siz
 
 # Functions like modulate_frequency() but this time to extract json words and replace them with a function, works for filters too
 def resolve_effect(effect, base=None):
+    if effect is None:
+        return base
+
     if not isinstance(effect, dict):
         return effect
 
@@ -258,10 +248,17 @@ def resolve_effect(effect, base=None):
 
     if mode == "glide":
         return glide(effect.get("start", base), effect["end"], effect["duration"])
+
     elif mode == "vibrato":
         return vibrato(effect.get("base", base), effect["rate"], effect["depth"])
 
     raise ValueError(f"Unknown effect: {mode}")
+
+# Function to resolve cutoff values, which may be single values or tuples/lists of values, potentially with effects like glide
+def resolve_cutoff(cutoff):
+    if isinstance(cutoff, (list, tuple)):
+        return tuple(resolve_effect(value) for value in cutoff)
+    return resolve_effect(cutoff)
 
 # Function to update a setting [name] with a [value]
 def update_setting(name, value):
@@ -272,9 +269,9 @@ def update_setting(name, value):
         if value not in ("sine", "square", "saw", "triangle", "pulse"):
             raise ValueError("Unknown waveform")
 
-    elif name == "filter_type":
-        if value not in ("none", "lowpass", "highpass", "bandpass"):
-            raise ValueError("Unknown filter type")
+    elif name in ("filter", "pitch_effect"):
+        if value is not None and not isinstance(value, dict):
+            raise ValueError(f"{name} must be a dictionary or None")
         
     else:
         value = float(value)
