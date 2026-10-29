@@ -15,16 +15,45 @@ ADSR = [0.5, 0.3, 0.8, 0.5]
 waveform = "sine"
 notes = ["C4", "E4", "G4"]
 
+SAMPLE_RATE = 44100
 
-def make_tone(freq=440, duration=1.0, waveform="sine"):
-    # Get envolope of amplitudes
-    envelope = make_adsr(duration, attack, decay, sustain, release)
-    # Time -> Freuqnecy pack -> phase
+DEFAULT_SETTINGS = {
+    "waveform": "sine",
+    "duration": 1.0,
+    "gain": 0.2,
+    "attack": 0.1,
+    "decay": 0.2,
+    "sustain": 0.7,
+    "release": 0.3
+}
+
+settings = DEFAULT_SETTINGS.copy()
+
+PRESETS = {
+    "pluck": {"waveform": "triangle", "attack": 0.005, "decay": 0.2, "sustain": 0, "release": 0.15},
+    "pad": {"waveform": "saw", "attack": 0.5, "decay": 0.3, "sustain": 0.8, "release": 1.0},
+    "lead": {"waveform": "square", "attack": 0.02, "decay": 0.15, "sustain": 0.7, "release": 0.2}
+}
+
+
+# Function that takes an input from config and a frequency in Hz and a duration to make a tone
+def make_tone(freq=440, duration=None, config=None):
+    config = settings if config is None else config
+    duration = config["duration"] if duration is None else duration
+
+    if isinstance(freq, str):
+        freq = note_to_frequency(freq)
+
+    envelope = make_adsr(duration, config["attack"], config["decay"], config["sustain"], config["release"])
     t = np.arange(len(envelope)) / SAMPLE_RATE
+
     frequency = resolve_time_series(freq, t)
     if np.any(frequency <= 0):
         raise ValueError("Oscillator frequency must be positive")
+
     phase = 2 * np.pi * (np.cumsum(frequency) - frequency) / SAMPLE_RATE
+
+    waveform = config["waveform"]
 
     # Use the phase with a waveform to get a tone
     if waveform == "sine":
@@ -46,7 +75,7 @@ def make_tone(freq=440, duration=1.0, waveform="sine"):
     else:
         raise ValueError("Unknown waveform")
 
-    return gain * signal * envelope
+    return config["gain"] * signal * envelope
 
 
 # Function to convert note name to MIDI number
@@ -80,13 +109,12 @@ def note_to_frequency(note):
     return frequency
 
 # Function to create a band of tones (chord) from a list of notes
-def mix_tones(notes, duration=1.0, waveform="sine", pitch_effect=None):
-
+def mix_tones(notes, duration=None, config=None, pitch_effect=None):
     if not notes:
         raise ValueError("Chord must contain at least one note")
 
     tones = [
-        make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, waveform)
+        make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, config)
         for note in notes
     ]
 
@@ -216,42 +244,86 @@ def dynamic_filter(audio, cutoff=1000, filter_type="lowpass", order=4, chunk_siz
 
     return output
 
+# Function to update a setting [name] with a [value]
+def update_setting(name, value):
+    if name not in DEFAULT_SETTINGS:
+        raise KeyError(f"Unknown setting: {name}")
+
+    if name == "waveform":
+        if value not in ("sine", "square", "saw", "triangle", "pulse"):
+            raise ValueError("Unknown waveform")
+    else:
+        value = float(value)
+        if not np.isfinite(value):
+            raise ValueError("Setting must be finite")
+        if name in ("duration", "attack", "decay", "release", "gain") and value < 0:
+            raise ValueError(f"{name} must be nonnegative")
+        if name == "sustain" and not 0 <= value <= 1:
+            raise ValueError("Sustain must be between 0 and 1")
+
+    settings[name] = value
+
+# Function that calls a preset
+def load_preset(name):
+    if name not in PRESETS:
+        raise KeyError(f"Unknown preset: {name}")
+
+    settings.clear()
+    settings.update(DEFAULT_SETTINGS)
+    for key, value in PRESETS[name].items():
+        update_setting(key, value)
+
+# Use terminal to change setting
+def change_settings():
+    while True:
+        command = input("Setting or preset (Enter to finish): ").lower().strip()
+        if not command:
+            break
+
+        if command in PRESETS:
+            load_preset(command)
+        elif command in settings:
+            value = input(f"{command} [{settings[command]}]: ").strip()
+            if value:
+                update_setting(command, value)
+        else:
+            print("Unknown setting or preset")
+
+    print("Current settings:", settings)
+
 
 
 
 
 while True:
     
+    # new_waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or waveform
+    # if new_waveform:
+    #     waveform = new_waveform
+    # if waveform == "quit":
+    #     break
 
-    new_waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or waveform
-    if new_waveform:
-        waveform = new_waveform
-    if waveform == "quit":
-        break
+    # # Use a full cord instead of a single note
+    # new_notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or notes
+    # if new_notes:
+    #     notes = new_notes
+    # pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
 
-    # Use a full cord instead of a single note
-    new_notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or notes
-    if new_notes:
-        notes = new_notes
-    pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
-
-    new_gain = float(input("Do you wish to change the gain? ") or gain)
-    if new_gain:
-        gain = new_gain
-    new_duration = float(input("Do you wish to change the duration? ") or duration)
-    if new_duration:
-        duration = new_duration
+    # new_gain = float(input("Do you wish to change the gain? ") or gain)
+    # if new_gain:
+    #     gain = new_gain
+    # new_duration = float(input("Do you wish to change the duration? ") or duration)
+    # if new_duration:
+    #     duration = new_duration
     
-    
-    
-    new_adsr = input("ADSR (A D S R), Enter to keep current: ").split()
-    if new_adsr:
-        ADSR = list(map(float, new_adsr))
-    attack, decay, sustain, release = ADSR
+    # new_adsr = input("ADSR (A D S R), Enter to keep current: ").split()
+    # if new_adsr:
+    #     ADSR = list(map(float, new_adsr))
+    # attack, decay, sustain, release = ADSR
 
-    audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
-    # filter_choice = input("Do you want to apply a filter? [lowpass, highpass, bandpass, none]: ").lower() or "none"
+    # audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
+    # # filter_choice = input("Do you want to apply a filter? [lowpass, highpass, bandpass, none]: ").lower() or "none"
 
-
+    audio = mix_tones(["C4", "E4", "G4"], 1.5)
     sd.play(audio, SAMPLE_RATE)
     sd.wait()
