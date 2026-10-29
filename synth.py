@@ -12,15 +12,19 @@ DEFAULT_SETTINGS = {
     "attack": 0.1,
     "decay": 0.2,
     "sustain": 0.7,
-    "release": 0.3
+    "release": 0.3,
+    "filter_type": "none",
+    "cutoff": 2000
 }
 
 settings = DEFAULT_SETTINGS.copy()
 
 PRESETS = {
     "pluck": {"waveform": "triangle", "attack": 0.005, "decay": 0.2, "sustain": 0, "release": 0.15},
-    "pad": {"waveform": "saw", "attack": 0.5, "decay": 0.3, "sustain": 0.8, "release": 1.0},
-    "lead": {"waveform": "square", "attack": 0.02, "decay": 0.15, "sustain": 0.7, "release": 0.2}
+    "pad": {"waveform": "saw", "attack": 0.5, "decay": 0.3, "sustain": 0.8, "release": 1.0,
+            "filter_type": "lowpass", "cutoff": 1500},
+    "lead": {"waveform": "square", "attack": 0.02, "decay": 0.15, "sustain": 0.7, "release": 0.2,
+             "filter_type": "lowpass", "cutoff": 3000}
 }
 
 
@@ -105,8 +109,14 @@ def mix_tones(notes, duration=None, config=None, pitch_effect=None):
         make_tone(modulate_frequency(note_to_frequency(note), pitch_effect), duration, config)
         for note in notes
     ]
+    
+    audio = np.mean(tones, axis=0)
+    config = settings if config is None else config
 
-    return np.mean(tones, axis=0)
+    if config["filter_type"] != "none":
+        audio = dynamic_filter(audio, cutoff=config["cutoff"], filter_type=config["filter_type"])
+
+    return audio
 
 # Function to create an ADSR envelope
 def make_adsr(duration, attack=0.1, decay=0.2, sustain=0.6, release=0.3):
@@ -240,6 +250,11 @@ def update_setting(name, value):
     if name == "waveform":
         if value not in ("sine", "square", "saw", "triangle", "pulse"):
             raise ValueError("Unknown waveform")
+
+    elif name == "filter_type":
+        if value not in ("none", "lowpass", "highpass", "bandpass"):
+            raise ValueError("Unknown filter type")
+        
     else:
         value = float(value)
         if not np.isfinite(value):
@@ -264,30 +279,61 @@ def load_preset(name):
 # Use terminal to change setting
 def change_settings():
     while True:
-        command = input("Setting or preset (Enter to finish): ").lower().strip()
+        print("\nCurrent settings:")
+        for name, value in settings.items():
+            print(f"  {name:<12} {value}")
+
+        command = input("\nSetting to change (Enter to finish): ").lower().strip()
         if not command:
             break
 
-        if command in PRESETS:
-            load_preset(command)
-        elif command in settings:
-            value = input(f"{command} [{settings[command]}]: ").strip()
-            if value:
+        if command not in settings:
+            print("Unknown setting")
+            continue
+
+        value = input(f"{command} [{settings[command]}]: ").strip()
+        if value:
+            try:
                 update_setting(command, value)
-        else:
-            print("Unknown setting or preset")
-
-    print("Current settings:", settings)
+            except ValueError as e:
+                print(e)
 
 
 
 
+
+notes = ["C4", "E4", "G4"]
+
+print("Python Synth — type 'help' for commands")
 
 while True:
- 
-    change_settings()
+    command = input("\nsynth> ").lower().strip()
 
+    if command in ("quit", "exit", "q"):
+        break
 
-    audio = mix_tones(["C4", "E4", "G4"], 1.5)
-    sd.play(audio, SAMPLE_RATE)
-    sd.wait()
+    elif command in ("help", "h"):
+        print("Commands: play, notes, settings, presets, quit")
+
+    elif command in ("play", "p"):
+        audio = mix_tones(notes)
+        sd.play(audio, SAMPLE_RATE)
+        sd.wait()
+
+    elif command == "notes":
+        value = input(f"Notes [{' '.join(notes)}]: ").upper().split()
+        if value:
+            notes = value
+
+    elif command == "settings":
+        change_settings()
+
+    elif command == "presets":
+        print("Available presets:", ", ".join(PRESETS))
+        name = input("Select preset (Enter to cancel): ").lower().strip()
+        if name:
+            load_preset(name)
+            print(f"Loaded preset: {name}")
+
+    else:
+        print("Unknown command. Type 'help' for options.")
