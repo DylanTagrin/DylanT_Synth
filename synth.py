@@ -5,18 +5,6 @@ from scipy.signal import butter, sosfilt
 
 SAMPLE_RATE = 44100
 
-attack=0.5
-decay=0.3
-sustain=0.8
-release=0.5
-duration = 4
-gain = 0.2
-ADSR = [0.5, 0.3, 0.8, 0.5]
-waveform = "sine"
-notes = ["C4", "E4", "G4"]
-
-SAMPLE_RATE = 44100
-
 DEFAULT_SETTINGS = {
     "waveform": "sine",
     "duration": 1.0,
@@ -296,33 +284,9 @@ def change_settings():
 
 
 while True:
-    
-    # new_waveform = input("Waveform (sine, square, saw, triangle, pulse, quit): ").lower() or waveform
-    # if new_waveform:
-    #     waveform = new_waveform
-    # if waveform == "quit":
-    #     break
+ 
+    change_settings()
 
-    # # Use a full cord instead of a single note
-    # new_notes = input("Notes (e.g. C4 E4 G4): ").upper().split() or notes
-    # if new_notes:
-    #     notes = new_notes
-    # pitch_effect = input("Do you want pitch modulation? [vibrato(rate, depth) glide(end freq, duration)] (e.g. vibrato 5 10): ").lower().split() or []
-
-    # new_gain = float(input("Do you wish to change the gain? ") or gain)
-    # if new_gain:
-    #     gain = new_gain
-    # new_duration = float(input("Do you wish to change the duration? ") or duration)
-    # if new_duration:
-    #     duration = new_duration
-    
-    # new_adsr = input("ADSR (A D S R), Enter to keep current: ").split()
-    # if new_adsr:
-    #     ADSR = list(map(float, new_adsr))
-    # attack, decay, sustain, release = ADSR
-
-    # audio = mix_tones(notes, duration, waveform, pitch_effect=pitch_effect)
-    # # filter_choice = input("Do you want to apply a filter? [lowpass, highpass, bandpass, none]: ").lower() or "none"
 
     audio = mix_tones(["C4", "E4", "G4"], 1.5)
     sd.play(audio, SAMPLE_RATE)
