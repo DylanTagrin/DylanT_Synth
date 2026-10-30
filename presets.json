@@ -41,6 +41,45 @@
                     "duration": 2
                 }
             }
+        },
+        "vibrato_lead": {
+            "waveform": "square",
+            "pitch_effect": {
+                "mode": "vibrato",
+                "rate": 5,
+                "depth": 10
+            }
+        },
+        "organ": {
+            "waveform": "square",
+            "attack": 0.01,
+            "decay": 0.01,
+            "sustain": 1.0,
+            "release": 0.08,
+            "filter": {"type": "lowpass", "cutoff": 2200}
+        },
+        "synth_bass": {
+            "waveform": "saw",
+            "attack": 0.01, "decay": 0.2, "sustain": 0.6, "release": 0.15,
+            "filter": {"type": "lowpass", "cutoff": 650}
+        },
+        "string_pad": {
+            "waveform": "saw",
+            "attack": 0.6, "decay": 0.4, "sustain": 0.8, "release": 1.5,
+            "filter": {
+                "type": "lowpass",
+                "cutoff": {"mode": "glide", "start": 4500, "end": 1100, "duration": 3}
+            }
+        },
+        "flute": {
+            "waveform": "sine",
+            "attack": 0.08, "decay": 0.1, "sustain": 0.85, "release": 0.2,
+            "pitch_effect": {"mode": "vibrato", "rate": 5, "depth": 2}
+        },
+        "piano_pluck": {
+            "waveform": "triangle",
+            "attack": 0.002, "decay": 0.5, "sustain": 0.0, "release": 0.15,
+            "filter": {"type": "lowpass", "cutoff": 3500}
         }
     }
 }

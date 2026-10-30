@@ -312,11 +312,48 @@ def change_settings():
         value = input(f"{command} [{settings[command]}]: ").strip()
         if value:
             try:
+                if command == "filter":
+                    value = parse_filter(value)
+                elif command == "pitch_effect":
+                    value = parse_pitch(value)
                 update_setting(command, value)
-            except ValueError as e:
-                print(e)
+            except (ValueError, TypeError, KeyError, IndexError) as e:
+                print(f"Invalid setting: {e}")                                                            
 
+# These two functions translate terminal friendly inputs into json friendly outputs
+def parse_filter(text):
+    parts = text.lower().split()
+    if not parts or parts[0] in ("none", "off"):
+        return None
 
+    filter_type = parts[0]
+    values = list(map(float, parts[1:]))
+
+    if filter_type in ("lowpass", "highpass") and len(values) == 1:
+        return {"type": filter_type, "cutoff": values[0]}
+
+    if filter_type == "bandpass" and len(values) == 2:
+        return {"type": filter_type, "cutoff": values}
+
+    raise ValueError("Use: lowpass 1200, highpass 300, bandpass 300 6000, or none")
+
+def parse_pitch(text):
+    parts = text.lower().split()
+    if not parts or parts[0] in ("none", "off"):
+        return None
+
+    mode = parts[0]
+    values = parts[1:]
+
+    if mode == "vibrato" and len(values) == 2:
+        return {"mode": "vibrato", "rate": float(values[0]), "depth": float(values[1])}
+
+    if mode == "glide" and len(values) == 2:
+        end = values[0]
+        return {"mode": "glide", "end": end.upper() if end[0].isalpha() else float(end),
+                "duration": float(values[1])}
+
+    raise ValueError("Use: vibrato 5 10, glide C5 1.5, or none")
 
 
 
